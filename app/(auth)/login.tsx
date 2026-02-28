@@ -3,18 +3,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { Colors } from "../../constants/colors";
@@ -186,6 +186,7 @@ export default function LoginScreen() {
                     placeholder=""
                     placeholderTextColor={Colors.textoTerciario}
                     secureTextEntry={!showPassword}
+                    autoCapitalize="none"
                     value={password}
                     onChangeText={setPassword}
                   />

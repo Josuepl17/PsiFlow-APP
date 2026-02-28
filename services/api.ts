@@ -2,7 +2,8 @@ import axios, { AxiosInstance } from "axios";
 import * as SecureStore from "expo-secure-store";
 
 // ⚠️ Altere para a URL do seu servidor Laravel em produção
-export const API_BASE_URL = "https://cronosdev.com.br"; // Servidor de produção
+export const API_BASE_URL =
+  "https://josuepachecodelima1771089880.2252045.meusitehostgator.com.br";
 
 const api: AxiosInstance = axios.create({
   baseURL: `${API_BASE_URL}/api/`,

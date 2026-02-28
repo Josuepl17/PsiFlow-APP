@@ -4,11 +4,15 @@ import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Colors } from "../constants/colors";
+import { useAutoSync } from "../hooks/useAutoSync";
 import { initDatabase } from "../services/database";
 import { useAuthStore } from "../stores/authStore";
 
 export default function RootLayout() {
   const { isAuthenticated, isLoading, loadAuth } = useAuthStore();
+
+  // Ativar sincronização automática global
+  useAutoSync();
 
   useEffect(() => {
     async function bootstrap() {

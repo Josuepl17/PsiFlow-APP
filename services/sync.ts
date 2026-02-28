@@ -1,4 +1,6 @@
 import NetInfo from "@react-native-community/netinfo";
+import { DeviceEventEmitter } from "react-native";
+import { agendarNotificacoesDeSessoes } from "../hooks/useNotifications";
 import { apiFetchAgendamentos, apiFetchPacientes } from "./api";
 import { getSyncLog, upsertAgendamentos, upsertPacientes } from "./database";
 
@@ -19,11 +21,22 @@ export async function temInternet(): Promise<boolean> {
   return !!(state.isConnected && state.isInternetReachable);
 }
 
+let lastSyncTime = 0;
+const SYNC_THROTTLE_MS = 5000; // 5 segundos para facilitar testes
+
 /**
  * Sincroniza agendamentos e pacientes com o servidor.
  * Retorna resultado com contagem de registros sincronizados.
  */
-export async function sincronizar(): Promise<SyncResult> {
+export async function sincronizar(force = false): Promise<SyncResult> {
+  const agora = Date.now();
+
+  // Se não for forçado e o último sync foi recente, ignora (Throttle)
+  if (!force && agora - lastSyncTime < SYNC_THROTTLE_MS) {
+    console.log("[Sync] Pulando sincronização automática (throttle ativo)");
+    return { sucesso: true, agendamentos: 0, pacientes: 0 };
+  }
+
   const online = await temInternet();
 
   if (!online) {
@@ -46,6 +59,17 @@ export async function sincronizar(): Promise<SyncResult> {
     const horario = new Date().toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
+    });
+
+    // Atualizar notificações locais após sync
+    await agendarNotificacoesDeSessoes();
+
+    lastSyncTime = Date.now();
+
+    // Notificar o sistema que a sincronia terminou (para atualizar telas abertas)
+    DeviceEventEmitter.emit("sync-finished", {
+      agendamentos: resAgendamentos.total ?? 0,
+      pacientes: resPacientes.total ?? 0,
     });
 
     return {

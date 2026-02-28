@@ -54,14 +54,22 @@ export async function agendarNotificacoesDeSessoes(): Promise<number> {
 
   await cancelarTodasNotificacoes();
 
-  const agora = new Date().toISOString();
-  const agendamentos = await getAgendamentosFuturos(agora);
+  // Obter Data e Hora Local (evitando UTC)
+  const agoraDate = new Date();
+  const dataLocal = agoraDate.toISOString().split("T")[0];
+  const horaLocal = agoraDate.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const agendamentos = await getAgendamentosFuturos(dataLocal, horaLocal);
 
   let agendadas = 0;
 
   for (const ag of agendamentos) {
     try {
-      // Montar Date completa do agendamento
+      // Montar Date da sessão considerando horário local
       const dataHoraStr = `${ag.data}T${ag.hora_inicial}`;
       const dataHoraSessao = new Date(dataHoraStr);
 
@@ -70,12 +78,11 @@ export async function agendarNotificacoesDeSessoes(): Promise<number> {
         dataHoraSessao.getTime() - 60 * 60 * 1000,
       );
 
-      // Só agendar se ainda está no futuro
-      if (dataNotificacao > new Date()) {
+      if (dataNotificacao > agoraDate) {
         await Notifications.scheduleNotificationAsync({
           content: {
             title: "🗓️ Sessão em 1 hora",
-            body: `Paciente: ${ag.nome_paciente} às ${ag.hora_inicial}`,
+            body: `Paciente: ${ag.nome_paciente} às ${ag.hora_inicial.substring(0, 5)}`,
             data: { agendamento_id: ag.id },
             sound: "default",
             ...(Platform.OS === "android" && { channelId: "sessoes" }),
@@ -87,11 +94,12 @@ export async function agendarNotificacoesDeSessoes(): Promise<number> {
         });
         agendadas++;
       }
-    } catch {
-      // Ignora agendamentos com datas inválidas
+    } catch (e) {
+      console.error("Erro ao agendar notificação:", e);
     }
   }
 
+  console.log(`[Notificações] ${agendadas} lembretes agendados.`);
   return agendadas;
 }
 

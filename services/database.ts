@@ -255,7 +255,8 @@ export async function getAgendamentosPorPaciente(
 
 /** Agendamentos futuros (para notificações) */
 export async function getAgendamentosFuturos(
-  agora: string,
+  data: string,
+  hora: string,
 ): Promise<Record<string, any>[]> {
   const database = await getDb();
   return (await database.getAllAsync(
@@ -263,11 +264,7 @@ export async function getAgendamentosFuturos(
      WHERE (data > ? OR (data = ? AND hora_inicial >= ?))
        AND status NOT IN ('Cancelado Pelo Paciente','Cancelado Pela Clinica','Concluido','Falta')
      ORDER BY data ASC, hora_inicial ASC`,
-    [
-      agora.split("T")[0],
-      agora.split("T")[0],
-      agora.split("T")[1]?.substring(0, 5) ?? "00:00",
-    ],
+    [data, data, hora],
   )) as Record<string, any>[];
 }
 
