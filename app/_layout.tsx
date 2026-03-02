@@ -1,13 +1,18 @@
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, LogBox, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Colors } from "../constants/colors";
 import { useAutoSync } from "../hooks/useAutoSync";
 import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { initDatabase } from "../services/database";
 import { useAuthStore } from "../stores/authStore";
+
+// Silenciar avisos do Expo Go sobre funcionalidades de notificação
+LogBox.ignoreLogs([
+  "`expo-notifications` functionality is not fully supported in Expo Go",
+]);
 
 export default function RootLayout() {
   const { isAuthenticated, isLoading, loadAuth } = useAuthStore();

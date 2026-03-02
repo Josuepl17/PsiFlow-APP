@@ -1,4 +1,5 @@
 import * as SQLite from "expo-sqlite";
+import { Agendamento, Paciente } from "../types";
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -91,18 +92,6 @@ export async function initDatabase(): Promise<void> {
     -- Inicializar sincronizacao se vazio
     INSERT OR IGNORE INTO sincronizacao (tabela, ultima_sync) VALUES ('agendamentos', NULL);
     INSERT OR IGNORE INTO sincronizacao (tabela, ultima_sync) VALUES ('pacientes', NULL);
-
-    -- Controle de sincronização (legado/auxiliar)
-    CREATE TABLE IF NOT EXISTS sync_log (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      tabela      TEXT NOT NULL UNIQUE,
-      ultima_sync TEXT
-    );
-
-    -- Inicializar sync_log se vazio
-    INSERT OR IGNORE INTO sync_log (tabela, ultima_sync) VALUES ('agendamentos', NULL);
-    INSERT OR IGNORE INTO sync_log (tabela, ultima_sync) VALUES ('pacientes', NULL);
-    INSERT OR IGNORE INTO sync_log (tabela, ultima_sync) VALUES ('users', NULL);
   `);
 }
 
@@ -142,11 +131,6 @@ export async function updateSincronizacao(
     "INSERT OR REPLACE INTO sincronizacao (tabela, ultima_sync) VALUES (?, ?)",
     [tabela, agora],
   );
-  // Manter compatibilidade com a tabela legada temporariamente
-  await database.runAsync(
-    "INSERT OR REPLACE INTO sync_log (tabela, ultima_sync) VALUES (?, ?)",
-    [tabela, agora],
-  );
 }
 
 /**
@@ -171,7 +155,7 @@ export async function getSincronizacao(): Promise<
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
-export async function upsertUser(user: Record<string, any>): Promise<void> {
+export async function upsertUser(user: any): Promise<void> {
   const database = await getDb();
   await database.runAsync(
     `INSERT OR REPLACE INTO users (
@@ -212,9 +196,7 @@ export async function getUser(id: number): Promise<Record<string, any> | null> {
 
 // ─── Pacientes ───────────────────────────────────────────────────────────────
 
-export async function upsertPacientes(
-  pacientes: Record<string, any>[],
-): Promise<void> {
+export async function upsertPacientes(pacientes: Paciente[]): Promise<void> {
   const database = await getDb();
   for (const p of pacientes) {
     await database.runAsync(
@@ -226,43 +208,42 @@ export async function upsertPacientes(
       [
         p.id,
         p.nome,
-        p.cpf,
-        p.telefone,
-        p.data_nascimento,
-        p.genero,
-        p.endereco,
-        p.bairro,
-        p.cidade,
-        p.nome_responsavel,
-        p.telefone_responsavel,
+        p.cpf ?? null,
+        p.telefone ?? null,
+        p.data_nascimento ?? null,
+        p.genero ?? null,
+        p.endereco ?? null,
+        p.bairro ?? null,
+        p.cidade ?? null,
+        p.nome_responsavel ?? null,
+        p.telefone_responsavel ?? null,
         p.status,
-        p.created_at,
-        p.updated_at,
+        p.created_at ?? null,
+        p.updated_at ?? null,
       ],
     );
   }
-  await updateSyncLog("pacientes");
 }
 
-export async function getPacientes(): Promise<Record<string, any>[]> {
+export async function getPacientes(): Promise<Paciente[]> {
   const database = await getDb();
   return (await database.getAllAsync(
     "SELECT * FROM pacientes WHERE status = ? ORDER BY nome ASC",
     ["ativo"],
-  )) as Record<string, any>[];
+  )) as Paciente[];
 }
 
-export async function getTodosPacientes(): Promise<Record<string, any>[]> {
+export async function getTodosPacientes(): Promise<Paciente[]> {
   const database = await getDb();
   return (await database.getAllAsync(
     "SELECT * FROM pacientes ORDER BY nome ASC",
-  )) as Record<string, any>[];
+  )) as Paciente[];
 }
 
 // ─── Agendamentos ─────────────────────────────────────────────────────────────
 
 export async function upsertAgendamentos(
-  agendamentos: Record<string, any>[],
+  agendamentos: Agendamento[],
 ): Promise<void> {
   const database = await getDb();
   for (const a of agendamentos) {
@@ -285,56 +266,55 @@ export async function upsertAgendamentos(
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         a.id,
-        a.clinica_id,
-        a.paciente_id,
-        a.psicologo_id,
-        a.recorrente_id,
+        a.clinica_id ?? null,
+        a.paciente_id ?? null,
+        a.psicologo_id ?? null,
+        a.recorrente_id ?? null,
         a.data,
         a.hora_inicial,
-        a.hora_final,
-        a.tipo,
-        a.recorrente_ate_date,
+        a.hora_final ?? null,
+        a.tipo ?? null,
+        a.recorrente_ate_date ?? null,
         a.nome_paciente,
-        a.nome_psicologo,
+        a.nome_psicologo ?? null,
         a.status,
         lembreteEnviado,
-        a.observacao,
-        a.created_at,
-        a.updated_at,
+        a.observacao ?? null,
+        a.created_at ?? null,
+        a.updated_at ?? null,
       ],
     );
   }
-  await updateSyncLog("agendamentos");
 }
 
 /** Todos os agendamentos (para pesquisa no app) */
-export async function getTodosAgendamentos(): Promise<Record<string, any>[]> {
+export async function getTodosAgendamentos(): Promise<Agendamento[]> {
   const database = await getDb();
   return (await database.getAllAsync(
     "SELECT * FROM agendamentos ORDER BY data ASC, hora_inicial ASC",
-  )) as Record<string, any>[];
+  )) as Agendamento[];
 }
 
 /** Agendamentos de uma data específica */
 export async function getAgendamentosPorData(
   data: string,
-): Promise<Record<string, any>[]> {
+): Promise<Agendamento[]> {
   const database = await getDb();
   return (await database.getAllAsync(
     "SELECT * FROM agendamentos WHERE data = ? ORDER BY hora_inicial ASC",
     [data],
-  )) as Record<string, any>[];
+  )) as Agendamento[];
 }
 
 /** Agendamentos por paciente */
 export async function getAgendamentosPorPaciente(
   pacienteId: number,
-): Promise<Record<string, any>[]> {
+): Promise<Agendamento[]> {
   const database = await getDb();
   return (await database.getAllAsync(
     "SELECT * FROM agendamentos WHERE paciente_id = ? ORDER BY data ASC, hora_inicial ASC",
     [pacienteId],
-  )) as Record<string, any>[];
+  )) as Agendamento[];
 }
 
 /** Agendamentos futuros (para notificações) */
@@ -342,7 +322,7 @@ export async function getAgendamentosFuturos(
   data: string,
   hora: string,
   limit: number = 50,
-): Promise<Record<string, any>[]> {
+): Promise<Agendamento[]> {
   const database = await getDb();
   return (await database.getAllAsync(
     `SELECT * FROM agendamentos
@@ -351,7 +331,7 @@ export async function getAgendamentosFuturos(
      ORDER BY data ASC, hora_inicial ASC
      LIMIT ?`,
     [data, data, hora, limit],
-  )) as Record<string, any>[];
+  )) as Agendamento[];
 }
 
 /** Marca um agendamento como lembrete enviado (localmente) */
@@ -363,29 +343,7 @@ export async function marcarLembreteEnviado(id: number): Promise<void> {
   );
 }
 
-// ─── Sync Log ─────────────────────────────────────────────────────────────────
-
-export async function updateSyncLog(tabela: string): Promise<void> {
-  const database = await getDb();
-  const agora = new Date().toISOString();
-  await database.runAsync(
-    "INSERT OR REPLACE INTO sync_log (tabela, ultima_sync) VALUES (?, ?)",
-    [tabela, agora],
-  );
-}
-
-export async function getSyncLog(): Promise<Record<string, string | null>> {
-  const database = await getDb();
-  const rows = (await database.getAllAsync("SELECT * FROM sync_log")) as Array<{
-    tabela: string;
-    ultima_sync: string | null;
-  }>;
-  const map: Record<string, string | null> = {};
-  rows.forEach((r) => {
-    map[r.tabela] = r.ultima_sync;
-  });
-  return map;
-}
+// ─── Fim do Banco de Dados ───────────────────────────────────────────────────
 
 /** Limpa todos os dados locais (logout) */
 export async function clearDatabase(): Promise<void> {
@@ -394,7 +352,6 @@ export async function clearDatabase(): Promise<void> {
     DELETE FROM agendamentos;
     DELETE FROM pacientes;
     DELETE FROM users;
-    UPDATE sync_log SET ultima_sync = NULL;
     UPDATE sincronizacao SET ultima_sync = NULL;
   `);
 }

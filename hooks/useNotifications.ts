@@ -6,6 +6,7 @@ import {
   getAgendamentosFuturos,
   marcarLembreteEnviado,
 } from "../services/database";
+import { Agendamento } from "../types";
 
 // Configurar comportamento das notificações
 Notifications.setNotificationHandler({
@@ -76,7 +77,11 @@ export async function agendarNotificacoesDeSessoes(
   );
 
   // Sempre busca os próximos 60 do banco local para garantir a janela cronológica correta
-  const agendamentos = await getAgendamentosFuturos(dataLocal, horaLocal, 60);
+  const agendamentos: Agendamento[] = await getAgendamentosFuturos(
+    dataLocal,
+    horaLocal,
+    60,
+  );
 
   let agendadas = 0;
 
@@ -89,8 +94,9 @@ export async function agendarNotificacoesDeSessoes(
       );
 
       if (dataNotificacao > agoraDate) {
+        const horaAlerta = format(dataNotificacao, "HH:mm:ss");
         console.log(
-          `[Notificações] Agendando/Atualizando lembrete 1h para ag_${ag.id} (${ag.hora_inicial})`,
+          `[Notificações] ⏰ AGENDANDO: ag_${ag.id} | Sessão: ${ag.hora_inicial.substring(0, 5)} | Alerta Programado: ${horaAlerta}`,
         );
         await Notifications.scheduleNotificationAsync({
           identifier: `ag_${ag.id}`,
@@ -109,7 +115,7 @@ export async function agendarNotificacoesDeSessoes(
         agendadas++;
       } else if (dataHoraSessao > agoraDate && ag.lembrete_enviado === 0) {
         console.log(
-          `[Notificações] Disparando alerta imediato para ag_${ag.id}`,
+          `[Notificações] ⚡ DISPARO IMEDIATO: ag_${ag.id} | Sessão: ${ag.hora_inicial.substring(0, 5)} (Menos de 1h para o início)`,
         );
         await Notifications.scheduleNotificationAsync({
           identifier: `ag_${ag.id}`,

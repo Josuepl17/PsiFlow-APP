@@ -3,7 +3,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
     Alert,
     Dimensions,
     Image,
@@ -14,9 +13,10 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
+import { LoadingOverlay } from "../../components/LoadingOverlay";
 import { Colors } from "../../constants/colors";
 import { apiLogin } from "../../services/api";
 import { upsertUser } from "../../services/database";
@@ -208,11 +208,7 @@ export default function LoginScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.button}
                 >
-                  {loading ? (
-                    <ActivityIndicator color={Colors.branco} />
-                  ) : (
-                    <Text style={styles.buttonText}>Entrar</Text>
-                  )}
+                  <Text style={styles.buttonText}>Entrar</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -226,6 +222,8 @@ export default function LoginScreen() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <LoadingOverlay visible={loading} message="Autenticando..." />
     </View>
   );
 }

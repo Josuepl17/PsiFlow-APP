@@ -17,14 +17,12 @@ export function useAutoSync(enabled: boolean = true) {
 
     async function initialSync() {
       // Sincroniza apenas na inicialização (abertura do app)
-      console.log("[AutoSync] Iniciando sincronia inicial (travando tela)...");
       setIsInitialSyncing(true);
       try {
         await sincronizar(true);
       } catch (e) {
         console.error("[AutoSync] Erro na sincronia inicial:", e);
       } finally {
-        console.log("[AutoSync] Sincronia inicial concluída (liberando tela).");
         setIsInitialSyncing(false);
       }
     }

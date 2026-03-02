@@ -1,35 +1,15 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 
-export interface UserData {
-  id: number;
-  clinica_id: number | null;
-  nome: string | null;
-  foto: string | null;
-  estado: string | null;
-  email: string | null;
-  cpf: string | null;
-  cargo: string | null;
-  crp: string | null;
-  telefone: string | null;
-  endereco: string | null;
-  bairro: string | null;
-  cidade: string | null;
-  genero: string | null;
-  status: string;
-  primeiro_acesso: string;
-  remember_token: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-}
+import { User } from "../types";
 
 interface AuthState {
-  user: UserData | null;
+  user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
-  setAuth: (token: string, user: UserData) => Promise<void>;
+  setAuth: (token: string, user: User) => Promise<void>;
   loadAuth: () => Promise<void>;
   clearAuth: () => Promise<void>;
 }
@@ -54,7 +34,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const token = await SecureStore.getItemAsync(TOKEN_KEY);
       const userStr = await SecureStore.getItemAsync(USER_KEY);
       if (token && userStr) {
-        const user = JSON.parse(userStr) as UserData;
+        const user = JSON.parse(userStr) as User;
         set({ token, user, isAuthenticated: true, isLoading: false });
       } else {
         set({ isLoading: false });

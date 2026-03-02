@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import * as SecureStore from "expo-secure-store";
+import { Agendamento, Paciente } from "../types";
 
 // ⚠️ Altere para a URL do seu servidor Laravel em produção
 export const API_BASE_URL =
@@ -42,11 +43,16 @@ export async function apiMe() {
 
 // ─── Agendamentos ──────────────────────────────────────────────────────────
 
-export async function apiFetchAgendamentos(since?: string | null) {
+export async function apiFetchAgendamentos(since?: string | null): Promise<{
+  success: boolean;
+  agendamentos: Agendamento[];
+  total: number;
+  server_time: string;
+}> {
   const response = await api.get("/mobile/agendamentos", {
     params: { since },
   });
-  return response.data; // { success, agendamentos, total }
+  return response.data;
 }
 
 export async function apiMarcarLembreteEnviado(id: number) {
@@ -56,11 +62,16 @@ export async function apiMarcarLembreteEnviado(id: number) {
 
 // ─── Pacientes ─────────────────────────────────────────────────────────────
 
-export async function apiFetchPacientes(since?: string | null) {
+export async function apiFetchPacientes(since?: string | null): Promise<{
+  success: boolean;
+  pacientes: Paciente[];
+  total: number;
+  server_time: string;
+}> {
   const response = await api.get("/mobile/pacientes", {
     params: { since },
   });
-  return response.data; // { success, pacientes, total }
+  return response.data;
 }
 
 export default api;

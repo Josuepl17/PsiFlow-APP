@@ -1,23 +1,16 @@
 import NetInfo from "@react-native-community/netinfo";
 import { DeviceEventEmitter } from "react-native";
 import { agendarNotificacoesDeSessoes } from "../hooks/useNotifications";
+import { SyncResult } from "../types";
 import { apiFetchAgendamentos, apiFetchPacientes } from "./api";
 import {
     getSincronizacao,
-    getSyncLog,
     updateSincronizacao,
     upsertAgendamentos,
     upsertPacientes,
 } from "./database";
 
-export type SyncResult = {
-  sucesso: boolean;
-  semInternet?: boolean;
-  erro?: string;
-  agendamentos?: number;
-  pacientes?: number;
-  horario?: string;
-};
+// Removido o type SyncResult interno para usar o global em ../types
 
 /**
  * Verifica se há conexão com a internet.
@@ -56,7 +49,7 @@ export async function sincronizar(force = false): Promise<SyncResult> {
     const sincePacientes = logsIncremental["pacientes"] ?? null;
 
     console.log(
-      `[Sync] Iniciando sync incremental. Agendamentos > ${sinceAgendamentos}, Pacientes > ${sincePacientes}`,
+      `[Sync] 🔄 INICIANDO SINCRONIZAÇÃO. Agendamentos > ${sinceAgendamentos}, Pacientes > ${sincePacientes}`,
     );
 
     // 2. Buscar em paralelo com os filtros
@@ -67,20 +60,6 @@ export async function sincronizar(force = false): Promise<SyncResult> {
 
     const countAgendamentos = resAgendamentos.agendamentos?.length ?? 0;
     const countPacientes = resPacientes.pacientes?.length ?? 0;
-
-    console.log(
-      `[Sync] Recebidos: ${countAgendamentos} agendamentos, ${countPacientes} pacientes`,
-    );
-
-    if (countAgendamentos > 0) {
-      console.log(
-        `[Sync] Detalhes dos agendamentos recebidos:`,
-        resAgendamentos.agendamentos.map((a: any) => ({
-          id: a.id,
-          updated_at: a.updated_at,
-        })),
-      );
-    }
 
     // 3. Salvar no SQLite
     await Promise.all([
@@ -115,6 +94,10 @@ export async function sincronizar(force = false): Promise<SyncResult> {
     lastSyncTime = Date.now();
 
     // Notificar o sistema que a sincronia terminou (para atualizar telas abertas)
+    console.log(
+      `[Sync] ✅ Sincronização concluída. Recebidos: ${countAgendamentos} agendamentos, ${countPacientes} pacientes.`,
+    );
+
     DeviceEventEmitter.emit("sync-finished", {
       agendamentos: resAgendamentos.total ?? 0,
       pacientes: resPacientes.total ?? 0,
@@ -133,12 +116,4 @@ export async function sincronizar(force = false): Promise<SyncResult> {
       erro: err?.response?.data?.message ?? err?.message ?? "Erro desconhecido",
     };
   }
-}
-
-/**
- * Retorna data/hora do último sync de agendamentos.
- */
-export async function getUltimaSync(): Promise<string | null> {
-  const log = await getSyncLog();
-  return log["agendamentos"] ?? null;
 }

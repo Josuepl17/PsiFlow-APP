@@ -4,7 +4,6 @@ import { ptBR } from "date-fns/locale";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
     DeviceEventEmitter,
     FlatList,
     RefreshControl,
@@ -16,18 +15,23 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Colors, getStatusColors } from "../../../constants/colors";
+import { AgendamentoCard } from "../../../components/AgendamentoCard";
+import { LoadingOverlay } from "../../../components/LoadingOverlay";
+import { Colors } from "../../../constants/colors";
 import {
     getTodosAgendamentos,
     getTodosPacientes,
 } from "../../../services/database";
 import { sincronizar, temInternet } from "../../../services/sync";
 import { useSyncStore } from "../../../stores/syncStore";
+import { Agendamento } from "../../../types";
 
 export default function AgendamentosScreen() {
   const { isInitialSyncing } = useSyncStore();
-  const [agendamentos, setAgendamentos] = useState<any[]>([]);
-  const [filteredAgendamentos, setFilteredAgendamentos] = useState<any[]>([]);
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [filteredAgendamentos, setFilteredAgendamentos] = useState<
+    Agendamento[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
@@ -65,9 +69,6 @@ export default function AgendamentosScreen() {
   // Escutar evento de sincronização finalizada para atualizar a lista automaticamente
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener("sync-finished", () => {
-      console.log(
-        "[Agendamentos] Sincronia detectada, atualizando lista silenciosamente...",
-      );
       carregarDados(true);
     });
 
@@ -118,49 +119,9 @@ export default function AgendamentosScreen() {
     setRefreshing(false);
   };
 
-  const renderItem = ({ item }: { item: any }) => {
-    const { bg, text } = getStatusColors(item.status);
-
-    return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.pacienteNome}>{item.nome_paciente}</Text>
-          <View style={[styles.badge, { backgroundColor: bg }]}>
-            <Text style={[styles.badgeText, { color: text }]}>
-              {item.status}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.cardBody}>
-          <View style={styles.infoRow}>
-            <Ionicons
-              name="time-outline"
-              size={16}
-              color={Colors.textoSecundario}
-            />
-            <Text style={styles.infoText}>
-              {item.hora_inicial.substring(0, 5)} -{" "}
-              {item.hora_final?.substring(0, 5) || "--:--"}
-            </Text>
-          </View>
-
-          {item.observacao ? (
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="document-text-outline"
-                size={16}
-                color={Colors.textoSecundario}
-              />
-              <Text style={styles.infoText} numberOfLines={2}>
-                {item.observacao}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-    );
-  };
+  const renderItem = ({ item }: { item: Agendamento }) => (
+    <AgendamentoCard item={item} />
+  );
 
   // O loading agora é um overlay, não bloqueamos mais a renderização total aqui para evitar piscadeira
 
@@ -275,14 +236,10 @@ export default function AgendamentosScreen() {
       )}
 
       {/* Overlay de carregamento bloqueante */}
-      {(loading || refreshing || isInitialSyncing) && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color={Colors.solidPurple} />
-            <Text style={styles.loadingText}>Carregando agendamentos...</Text>
-          </View>
-        </View>
-      )}
+      <LoadingOverlay
+        visible={loading || refreshing || isInitialSyncing}
+        message="Carregando agendamentos..."
+      />
     </View>
   );
 }
@@ -339,48 +296,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 100,
   },
-  card: {
-    backgroundColor: "rgba(37, 37, 42, 0.8)",
-    borderRadius: 15,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#27272a",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  pacienteNome: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: Colors.textoPrimario,
-    flex: 1,
-    marginRight: 8,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  cardBody: {
-    gap: 8,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: Colors.textoSecundario,
-  },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -408,26 +323,5 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 999,
-  },
-  loadingCard: {
-    backgroundColor: "rgba(30, 30, 35, 0.95)",
-    padding: 30,
-    borderRadius: 20,
-    alignItems: "center",
-    gap: 15,
-    borderWidth: 1,
-    borderColor: "#3f3f46",
-  },
-  loadingText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
   },
 });
