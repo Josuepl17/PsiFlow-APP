@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { format, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LinearGradient } from "expo-linear-gradient";
@@ -6,6 +7,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
     DeviceEventEmitter,
     FlatList,
+    Platform,
     RefreshControl,
     StyleSheet,
     Text,
@@ -40,6 +42,7 @@ export default function AgendamentosScreen() {
   // Filtros
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
   const [filtroPaciente, setFiltroPaciente] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const carregarDados = useCallback(async (silencioso = false) => {
     try {
@@ -144,9 +147,34 @@ export default function AgendamentosScreen() {
             />
           </TouchableOpacity>
 
-          <Text style={styles.dateText}>
-            {format(dataSelecionada, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-          </Text>
+          <TouchableOpacity
+            onPress={() => setShowDatePicker(true)}
+            style={styles.dateDisplay}
+          >
+            <Text style={styles.dateText}>
+              {format(dataSelecionada, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </Text>
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={Colors.solidPurple}
+              style={{ marginLeft: 8 }}
+            />
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={dataSelecionada}
+              mode="date"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) {
+                  setDataSelecionada(selectedDate);
+                }
+              }}
+            />
+          )}
 
           <TouchableOpacity
             onPress={() =>
@@ -273,6 +301,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     textTransform: "capitalize",
+  },
+  dateDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(124, 58, 237, 0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   searchBar: {
     flexDirection: "row",
