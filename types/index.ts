@@ -77,3 +77,12 @@ export interface SyncResult {
   pacientes?: number;
   horario?: string;
 }
+/**
+ * Estatísticas para o Dashboard (Mês Atual)
+ */
+export interface DashboardStats {
+  concluidos: number;
+  cancelados: number;
+  agendados: number;
+  total: number;
+}

@@ -34,7 +34,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated) {
-        router.replace("/(app)/agendamentos");
+        router.replace("/(app)/dashboard");
       } else {
         router.replace("/(auth)/login");
       }

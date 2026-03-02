@@ -15,16 +15,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AgendamentoCard } from "../../../components/AgendamentoCard";
-import { LoadingOverlay } from "../../../components/LoadingOverlay";
-import { Colors } from "../../../constants/colors";
+import { AgendamentoCard } from "../../components/AgendamentoCard";
+import { LoadingOverlay } from "../../components/LoadingOverlay";
+import { Colors } from "../../constants/colors";
 import {
     getTodosAgendamentos,
     getTodosPacientes,
-} from "../../../services/database";
-import { sincronizar, temInternet } from "../../../services/sync";
-import { useSyncStore } from "../../../stores/syncStore";
-import { Agendamento } from "../../../types";
+} from "../../services/database";
+import { sincronizar, temInternet } from "../../services/sync";
+import { useSyncStore } from "../../stores/syncStore";
+import { Agendamento } from "../../types";
 
 export default function AgendamentosScreen() {
   const { isInitialSyncing } = useSyncStore();

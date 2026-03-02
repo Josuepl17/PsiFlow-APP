@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import { Agendamento, Paciente } from "../types";
+import { Agendamento, DashboardStats, Paciente } from "../types";
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -341,6 +341,50 @@ export async function marcarLembreteEnviado(id: number): Promise<void> {
     "UPDATE agendamentos SET lembrete_enviado = 1 WHERE id = ?",
     [id],
   );
+}
+
+/**
+ * Obtém as estatísticas de atendimentos para um mês específico.
+ * @param mesAno Formato "YYYY-MM"
+ */
+export async function getEstatisticasMensais(
+  mesAno: string,
+): Promise<DashboardStats> {
+  const database = await getDb();
+  const pattern = `${mesAno}-%`;
+
+  // 1. Concluídos
+  const resConcluidos = await database.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM agendamentos WHERE data LIKE ? AND status = 'Concluido'",
+    [pattern],
+  );
+
+  // 2. Cancelados (Conforme solicitado pelo usuário)
+  const resCancelados = await database.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM agendamentos 
+     WHERE data LIKE ? 
+     AND status IN ('Cancelado Pela Clinica', 'Cancelado Pelo Paciente', 'Falta')`,
+    [pattern],
+  );
+
+  // 3. Agendados (Qualquer um que não seja Cancelado ou Concluido)
+  const resAgendados = await database.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM agendamentos 
+     WHERE data LIKE ? 
+     AND status NOT IN ('Concluido', 'Cancelado Pela Clinica', 'Cancelado Pelo Paciente', 'Falta')`,
+    [pattern],
+  );
+
+  const concluidos = resConcluidos?.count || 0;
+  const cancelados = resCancelados?.count || 0;
+  const agendados = resAgendados?.count || 0;
+
+  return {
+    concluidos,
+    cancelados,
+    agendados,
+    total: concluidos + cancelados + agendados,
+  };
 }
 
 // ─── Fim do Banco de Dados ───────────────────────────────────────────────────

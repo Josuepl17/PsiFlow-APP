@@ -33,7 +33,18 @@ export default function AppLayout() {
       }}
     >
       <Tabs.Screen
-        name="agendamentos/index"
+        name="dashboard"
+        options={{
+          title: "Início",
+          tabBarLabel: "Início",
+          headerTitle: "PsiFlow - Início",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="stats-chart" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="agendamentos"
         options={{
           title: "Agenda",
           tabBarLabel: "Agenda",
