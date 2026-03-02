@@ -74,4 +74,16 @@ export async function apiFetchPacientes(since?: string | null): Promise<{
   return response.data;
 }
 
+export async function apiFetchArquivos(since?: string | null): Promise<{
+  success: boolean;
+  arquivos: any[];
+  total: number;
+  server_time: string;
+}> {
+  const response = await api.get("/mobile/arquivos", {
+    params: { since },
+  });
+  return response.data;
+}
+
 export default api;

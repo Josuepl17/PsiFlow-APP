@@ -54,7 +54,36 @@ export default function AppLayout() {
           ),
         }}
       />
-      {/* Podemos adicionar mais telas aqui no futuro (Pacientes, Perfil, etc) */}
+      <Tabs.Screen
+        name="pacientes"
+        options={{
+          title: "Pacientes",
+          tabBarLabel: "Pacientes",
+          headerTitle: "PsiFlow - Pacientes",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="paciente/[id]"
+        options={{
+          href: null,
+          headerTitle: "Detalhes do Paciente",
+          headerShown: true,
+        }}
+      />
+      <Tabs.Screen
+        name="perfil"
+        options={{
+          title: "Perfil",
+          tabBarLabel: "Perfil",
+          headerTitle: "PsiFlow - Meu Perfil",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-circle" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

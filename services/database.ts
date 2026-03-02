@@ -1,5 +1,10 @@
 import * as SQLite from "expo-sqlite";
-import { Agendamento, DashboardStats, Paciente } from "../types";
+import {
+    Agendamento,
+    ArquivoPaciente,
+    DashboardStats,
+    Paciente,
+} from "../types";
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -82,6 +87,21 @@ export async function initDatabase(): Promise<void> {
       updated_at            TEXT
     );
 
+    -- Tabela arquivos_pacientes (metadados — download ocorre manualmente)
+    CREATE TABLE IF NOT EXISTS arquivos_pacientes (
+      id            INTEGER PRIMARY KEY,
+      paciente_id   INTEGER NOT NULL,
+      psicologo_id  INTEGER,
+      clinica_id    INTEGER,
+      evolucao_id   INTEGER,
+      nome          TEXT NOT NULL,
+      nome_original TEXT NOT NULL,
+      path          TEXT NOT NULL,
+      size          INTEGER,
+      created_at    TEXT,
+      updated_at    TEXT
+    );
+
     -- Controle de sincronização incremental (solicitado pelo usuário)
     CREATE TABLE IF NOT EXISTS sincronizacao (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,6 +112,7 @@ export async function initDatabase(): Promise<void> {
     -- Inicializar sincronizacao se vazio
     INSERT OR IGNORE INTO sincronizacao (tabela, ultima_sync) VALUES ('agendamentos', NULL);
     INSERT OR IGNORE INTO sincronizacao (tabela, ultima_sync) VALUES ('pacientes', NULL);
+    INSERT OR IGNORE INTO sincronizacao (tabela, ultima_sync) VALUES ('arquivos_pacientes', NULL);
   `);
 }
 
@@ -389,6 +410,49 @@ export async function getEstatisticasMensais(
 
 // ─── Fim do Banco de Dados ───────────────────────────────────────────────────
 
+// ─── Arquivos de Pacientes ────────────────────────────────────────────────────
+
+/** Upsert de metadados de arquivos vindos do servidor */
+export async function upsertArquivos(
+  arquivos: ArquivoPaciente[],
+): Promise<void> {
+  const database = await getDb();
+  for (const a of arquivos) {
+    await database.runAsync(
+      `INSERT OR REPLACE INTO arquivos_pacientes (
+        id, paciente_id, psicologo_id, clinica_id, evolucao_id,
+        nome, nome_original, path, size, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        a.id,
+        a.paciente_id,
+        a.psicologo_id ?? null,
+        a.clinica_id ?? null,
+        a.evolucao_id ?? null,
+        a.nome,
+        a.nome_original,
+        a.path,
+        a.size ?? null,
+        a.created_at ?? null,
+        a.updated_at ?? null,
+      ],
+    );
+  }
+}
+
+/** Retorna os arquivos de um paciente específico */
+export async function getArquivosPorPaciente(
+  pacienteId: number,
+): Promise<ArquivoPaciente[]> {
+  const database = await getDb();
+  return (await database.getAllAsync(
+    "SELECT * FROM arquivos_pacientes WHERE paciente_id = ? ORDER BY created_at DESC",
+    [pacienteId],
+  )) as ArquivoPaciente[];
+}
+
+// ─── Fim do Banco de Dados ───────────────────────────────────────────────────
+
 /** Limpa todos os dados locais (logout) */
 export async function clearDatabase(): Promise<void> {
   const database = await getDb();
@@ -396,6 +460,7 @@ export async function clearDatabase(): Promise<void> {
     DELETE FROM agendamentos;
     DELETE FROM pacientes;
     DELETE FROM users;
+    DELETE FROM arquivos_pacientes;
     UPDATE sincronizacao SET ultima_sync = NULL;
   `);
 }

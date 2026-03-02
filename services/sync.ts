@@ -2,11 +2,16 @@ import NetInfo from "@react-native-community/netinfo";
 import { DeviceEventEmitter } from "react-native";
 import { agendarNotificacoesDeSessoes } from "../hooks/useNotifications";
 import { SyncResult } from "../types";
-import { apiFetchAgendamentos, apiFetchPacientes } from "./api";
+import {
+    apiFetchAgendamentos,
+    apiFetchArquivos,
+    apiFetchPacientes,
+} from "./api";
 import {
     getSincronizacao,
     updateSincronizacao,
     upsertAgendamentos,
+    upsertArquivos,
     upsertPacientes,
 } from "./database";
 
@@ -47,9 +52,10 @@ export async function sincronizar(force = false): Promise<SyncResult> {
     const logsIncremental = await getSincronizacao();
     const sinceAgendamentos = logsIncremental["agendamentos"] ?? null;
     const sincePacientes = logsIncremental["pacientes"] ?? null;
+    const sinceArquivos = logsIncremental["arquivos_pacientes"] ?? null;
 
     console.log(
-      `[Sync] 🔄 INICIANDO SINCRONIZAÇÃO. Agendamentos > ${sinceAgendamentos}, Pacientes > ${sincePacientes}`,
+      `[Sync] 🔄 INICIANDO SINCRONIZAÇÃO. Agendamentos > ${sinceAgendamentos}, Pacientes > ${sincePacientes}, Arquivos > ${sinceArquivos}`,
     );
 
     // 2. Buscar em paralelo com os filtros
@@ -61,18 +67,31 @@ export async function sincronizar(force = false): Promise<SyncResult> {
     const countAgendamentos = resAgendamentos.agendamentos?.length ?? 0;
     const countPacientes = resPacientes.pacientes?.length ?? 0;
 
-    // 3. Salvar no SQLite
+    // 3. Salvar agendamentos e pacientes no SQLite
     await Promise.all([
       upsertAgendamentos(resAgendamentos.agendamentos ?? []),
       upsertPacientes(resPacientes.pacientes ?? []),
     ]);
 
     // 4. Atualizar o timestamp da sincronização incremental usando o horário do SERVIDOR
-    // Isso evita problemas de fuso horário ou relógio do celular desregulado.
     await Promise.all([
       updateSincronizacao("agendamentos", resAgendamentos.server_time),
       updateSincronizacao("pacientes", resPacientes.server_time),
     ]);
+
+    // 5. Sincronizar arquivos de pacientes (tolerante a falhas: rota pode não existir no servidor ainda)
+    let countArquivos = 0;
+    try {
+      const resArquivos = await apiFetchArquivos(sinceArquivos);
+      countArquivos = resArquivos.arquivos?.length ?? 0;
+      await upsertArquivos(resArquivos.arquivos ?? []);
+      await updateSincronizacao("arquivos_pacientes", resArquivos.server_time);
+    } catch (errArquivos: any) {
+      console.warn(
+        "[Sync] ⚠️ Sincronização de arquivos falhou (rota disponível após deploy do backend):",
+        errArquivos?.response?.status ?? errArquivos?.message,
+      );
+    }
 
     const horario = new Date().toLocaleTimeString("pt-BR", {
       hour: "2-digit",
@@ -95,7 +114,7 @@ export async function sincronizar(force = false): Promise<SyncResult> {
 
     // Notificar o sistema que a sincronia terminou (para atualizar telas abertas)
     console.log(
-      `[Sync] ✅ Sincronização concluída. Recebidos: ${countAgendamentos} agendamentos, ${countPacientes} pacientes.`,
+      `[Sync] ✅ Sincronização concluída. Recebidos: ${countAgendamentos} agendamentos, ${countPacientes} pacientes, ${countArquivos} arquivos.`,
     );
 
     DeviceEventEmitter.emit("sync-finished", {

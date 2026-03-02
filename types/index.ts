@@ -86,3 +86,20 @@ export interface DashboardStats {
   agendados: number;
   total: number;
 }
+
+/**
+ * Interface que representa um Arquivo de Paciente (metadados do servidor)
+ */
+export interface ArquivoPaciente {
+  id: number;
+  paciente_id: number;
+  psicologo_id: number;
+  clinica_id: number;
+  evolucao_id: number | null;
+  nome: string; // nome do arquivo no storage (ex: uuid.pdf)
+  nome_original: string; // nome original do arquivo (ex: laudo.pdf)
+  path: string; // caminho no storage (ex: arquivos/pacientes/uuid.pdf)
+  size: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
