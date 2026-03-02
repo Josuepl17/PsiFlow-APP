@@ -5,14 +5,18 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Colors } from "../constants/colors";
 import { useAutoSync } from "../hooks/useAutoSync";
+import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { initDatabase } from "../services/database";
 import { useAuthStore } from "../stores/authStore";
 
 export default function RootLayout() {
   const { isAuthenticated, isLoading, loadAuth } = useAuthStore();
 
-  // Ativar sincronização automática global
-  useAutoSync();
+  // Ativar sincronização automática global (apenas se estiver autenticado)
+  useAutoSync(isAuthenticated);
+
+  // Ativar verificação de atualizações do EAS
+  useUpdateCheck();
 
   useEffect(() => {
     async function bootstrap() {
@@ -20,7 +24,7 @@ export default function RootLayout() {
       await loadAuth();
     }
     bootstrap();
-  }, []);
+  }, [loadAuth]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -32,6 +36,7 @@ export default function RootLayout() {
     }
   }, [isAuthenticated, isLoading]);
 
+  // Mostrar loading apenas enquanto carrega a autenticação
   if (isLoading) {
     return (
       <View style={styles.loading}>

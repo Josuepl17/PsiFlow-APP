@@ -1,6 +1,11 @@
+import { format } from "date-fns";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { getAgendamentosFuturos } from "../services/database";
+import { apiMarcarLembreteEnviado } from "../services/api";
+import {
+  getAgendamentosFuturos,
+  marcarLembreteEnviado,
+} from "../services/database";
 
 // Configurar comportamento das notificações
 Notifications.setNotificationHandler({
@@ -46,40 +51,49 @@ export async function cancelarTodasNotificacoes(): Promise<void> {
 
 /**
  * Agenda notificações locais 1h antes para cada agendamento futuro.
- * Cancela as anteriores antes de reagendar (evita duplicatas).
+ * 'novosAgendamentos': Se passado, agenda apenas estes pontualmente.
+ * 'cancelarPrior': Se true, limpa o sistema antes de começar (usar na primeira carga).
  */
-export async function agendarNotificacoesDeSessoes(): Promise<number> {
+export async function agendarNotificacoesDeSessoes(
+  cancelarPrior: boolean = false,
+): Promise<number> {
   const permissao = await solicitarPermissaoNotificacoes();
   if (!permissao) return 0;
 
-  await cancelarTodasNotificacoes();
+  if (cancelarPrior) {
+    console.log(
+      "[Notificações] Limpando fila antiga para evitar limite de 500",
+    );
+    await cancelarTodasNotificacoes();
+  }
 
-  // Obter Data e Hora Local (evitando UTC)
   const agoraDate = new Date();
-  const dataLocal = agoraDate.toISOString().split("T")[0];
-  const horaLocal = agoraDate.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  const dataLocal = format(agoraDate, "yyyy-MM-dd");
+  const horaLocal = format(agoraDate, "HH:mm:ss");
 
-  const agendamentos = await getAgendamentosFuturos(dataLocal, horaLocal);
+  console.log(
+    `[Notificações] Processando agendamentos após: ${dataLocal} ${horaLocal}`,
+  );
+
+  // Sempre busca os próximos 60 do banco local para garantir a janela cronológica correta
+  const agendamentos = await getAgendamentosFuturos(dataLocal, horaLocal, 60);
 
   let agendadas = 0;
 
   for (const ag of agendamentos) {
     try {
-      // Montar Date da sessão considerando horário local
       const dataHoraStr = `${ag.data}T${ag.hora_inicial}`;
       const dataHoraSessao = new Date(dataHoraStr);
-
-      // 1h antes
       const dataNotificacao = new Date(
         dataHoraSessao.getTime() - 60 * 60 * 1000,
       );
 
       if (dataNotificacao > agoraDate) {
+        console.log(
+          `[Notificações] Agendando/Atualizando lembrete 1h para ag_${ag.id} (${ag.hora_inicial})`,
+        );
         await Notifications.scheduleNotificationAsync({
+          identifier: `ag_${ag.id}`,
           content: {
             title: "🗓️ Sessão em 1 hora",
             body: `Paciente: ${ag.nome_paciente} às ${ag.hora_inicial.substring(0, 5)}`,
@@ -93,14 +107,35 @@ export async function agendarNotificacoesDeSessoes(): Promise<number> {
           },
         });
         agendadas++;
+      } else if (dataHoraSessao > agoraDate && ag.lembrete_enviado === 0) {
+        console.log(
+          `[Notificações] Disparando alerta imediato para ag_${ag.id}`,
+        );
+        await Notifications.scheduleNotificationAsync({
+          identifier: `ag_${ag.id}`,
+          content: {
+            title: "🔔 Sessão em breve",
+            body: `Sessão com ${ag.nome_paciente} às ${ag.hora_inicial.substring(0, 5)}`,
+            data: { agendamento_id: ag.id },
+            sound: "default",
+            ...(Platform.OS === "android" && { channelId: "sessoes" }),
+          },
+          trigger: null,
+        });
+        await marcarLembreteEnviado(ag.id);
+        try {
+          await apiMarcarLembreteEnviado(ag.id);
+        } catch {}
+        agendadas++;
       }
     } catch (e) {
       console.error("Erro ao agendar notificação:", e);
     }
   }
 
-  console.log(`[Notificações] ${agendadas} lembretes agendados.`);
+  console.log(`[Notificações] ${agendadas} lembretes processados.`);
   return agendadas;
 }
 
 export { Notifications };
+

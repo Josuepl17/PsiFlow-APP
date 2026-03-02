@@ -2,7 +2,13 @@ import NetInfo from "@react-native-community/netinfo";
 import { DeviceEventEmitter } from "react-native";
 import { agendarNotificacoesDeSessoes } from "../hooks/useNotifications";
 import { apiFetchAgendamentos, apiFetchPacientes } from "./api";
-import { getSyncLog, upsertAgendamentos, upsertPacientes } from "./database";
+import {
+    getSincronizacao,
+    getSyncLog,
+    updateSincronizacao,
+    upsertAgendamentos,
+    upsertPacientes,
+} from "./database";
 
 export type SyncResult = {
   sucesso: boolean;
@@ -44,16 +50,49 @@ export async function sincronizar(force = false): Promise<SyncResult> {
   }
 
   try {
-    // Buscar em paralelo
+    // 1. Buscar última data de sincronização incremental
+    const logsIncremental = await getSincronizacao();
+    const sinceAgendamentos = logsIncremental["agendamentos"] ?? null;
+    const sincePacientes = logsIncremental["pacientes"] ?? null;
+
+    console.log(
+      `[Sync] Iniciando sync incremental. Agendamentos > ${sinceAgendamentos}, Pacientes > ${sincePacientes}`,
+    );
+
+    // 2. Buscar em paralelo com os filtros
     const [resAgendamentos, resPacientes] = await Promise.all([
-      apiFetchAgendamentos(),
-      apiFetchPacientes(),
+      apiFetchAgendamentos(sinceAgendamentos),
+      apiFetchPacientes(sincePacientes),
     ]);
 
-    // Salvar no SQLite
+    const countAgendamentos = resAgendamentos.agendamentos?.length ?? 0;
+    const countPacientes = resPacientes.pacientes?.length ?? 0;
+
+    console.log(
+      `[Sync] Recebidos: ${countAgendamentos} agendamentos, ${countPacientes} pacientes`,
+    );
+
+    if (countAgendamentos > 0) {
+      console.log(
+        `[Sync] Detalhes dos agendamentos recebidos:`,
+        resAgendamentos.agendamentos.map((a: any) => ({
+          id: a.id,
+          updated_at: a.updated_at,
+        })),
+      );
+    }
+
+    // 3. Salvar no SQLite
     await Promise.all([
       upsertAgendamentos(resAgendamentos.agendamentos ?? []),
       upsertPacientes(resPacientes.pacientes ?? []),
+    ]);
+
+    // 4. Atualizar o timestamp da sincronização incremental usando o horário do SERVIDOR
+    // Isso evita problemas de fuso horário ou relógio do celular desregulado.
+    await Promise.all([
+      updateSincronizacao("agendamentos", resAgendamentos.server_time),
+      updateSincronizacao("pacientes", resPacientes.server_time),
     ]);
 
     const horario = new Date().toLocaleTimeString("pt-BR", {
@@ -61,8 +100,17 @@ export async function sincronizar(force = false): Promise<SyncResult> {
       minute: "2-digit",
     });
 
-    // Atualizar notificações locais após sync
-    await agendarNotificacoesDeSessoes();
+    // Atualizar notificações locais apenas se houver agendamentos novos ou se for uma carga inicial
+    if (countAgendamentos > 0 || force) {
+      console.log(
+        force
+          ? "[Sync] Carga forçada/inicial: Refazendo janela de 60 notificações..."
+          : "[Sync] Agendamentos novos: Atualizando lembretes pontuais...",
+      );
+      await agendarNotificacoesDeSessoes(
+        force, // Limpa o sistema apenas em carga forçada/inicial
+      );
+    }
 
     lastSyncTime = Date.now();
 
@@ -79,6 +127,7 @@ export async function sincronizar(force = false): Promise<SyncResult> {
       horario,
     };
   } catch (err: any) {
+    console.error("[Sync] Erro:", err);
     return {
       sucesso: false,
       erro: err?.response?.data?.message ?? err?.message ?? "Erro desconhecido",

@@ -81,7 +81,18 @@ export async function initDatabase(): Promise<void> {
       updated_at            TEXT
     );
 
-    -- Controle de sincronização
+    -- Controle de sincronização incremental (solicitado pelo usuário)
+    CREATE TABLE IF NOT EXISTS sincronizacao (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      tabela      TEXT NOT NULL UNIQUE,
+      ultima_sync TEXT -- Formato: YYYY-MM-DD HH:MM:SS
+    );
+
+    -- Inicializar sincronizacao se vazio
+    INSERT OR IGNORE INTO sincronizacao (tabela, ultima_sync) VALUES ('agendamentos', NULL);
+    INSERT OR IGNORE INTO sincronizacao (tabela, ultima_sync) VALUES ('pacientes', NULL);
+
+    -- Controle de sincronização (legado/auxiliar)
     CREATE TABLE IF NOT EXISTS sync_log (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       tabela      TEXT NOT NULL UNIQUE,
@@ -93,6 +104,69 @@ export async function initDatabase(): Promise<void> {
     INSERT OR IGNORE INTO sync_log (tabela, ultima_sync) VALUES ('pacientes', NULL);
     INSERT OR IGNORE INTO sync_log (tabela, ultima_sync) VALUES ('users', NULL);
   `);
+}
+
+// ─── Sincronização Incremental (Auxiliares) ───────────────────────────────────
+
+/**
+ * Formata um objeto Date para o padrão SQL: YYYY-MM-DD HH:MM:SS
+ */
+function formatarDataSQL(date: Date): string {
+  const pad = (num: number) => num.toString().padStart(2, "0");
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    " " +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes()) +
+    ":" +
+    pad(date.getSeconds())
+  );
+}
+
+/**
+ * Atualiza o momento exato da sincronização para uma tabela.
+ * Aceita um timestamp opcional (ex: vindo do servidor).
+ */
+export async function updateSincronizacao(
+  tabela: string,
+  timestamp?: string,
+): Promise<void> {
+  const database = await getDb();
+  const agora = timestamp || formatarDataSQL(new Date());
+  await database.runAsync(
+    "INSERT OR REPLACE INTO sincronizacao (tabela, ultima_sync) VALUES (?, ?)",
+    [tabela, agora],
+  );
+  // Manter compatibilidade com a tabela legada temporariamente
+  await database.runAsync(
+    "INSERT OR REPLACE INTO sync_log (tabela, ultima_sync) VALUES (?, ?)",
+    [tabela, agora],
+  );
+}
+
+/**
+ * Retorna os registros de sincronização incremental.
+ */
+export async function getSincronizacao(): Promise<
+  Record<string, string | null>
+> {
+  const database = await getDb();
+  const rows = (await database.getAllAsync(
+    "SELECT * FROM sincronizacao",
+  )) as Array<{
+    tabela: string;
+    ultima_sync: string;
+  }>;
+  const map: Record<string, string | null> = {};
+  rows.forEach((r) => {
+    map[r.tabela] = r.ultima_sync;
+  });
+  return map;
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -192,6 +266,16 @@ export async function upsertAgendamentos(
 ): Promise<void> {
   const database = await getDb();
   for (const a of agendamentos) {
+    // Verificar se já existe e se o lembrete já foi enviado localmente
+    const existing = await database.getFirstAsync<{ lembrete_enviado: number }>(
+      "SELECT lembrete_enviado FROM agendamentos WHERE id = ?",
+      [a.id],
+    );
+
+    // Preservar o 1 caso o local ou o do servidor seja 1
+    const lembreteEnviado =
+      existing?.lembrete_enviado === 1 || a.lembrete_enviado ? 1 : 0;
+
     await database.runAsync(
       `INSERT OR REPLACE INTO agendamentos (
         id, clinica_id, paciente_id, psicologo_id, recorrente_id,
@@ -213,7 +297,7 @@ export async function upsertAgendamentos(
         a.nome_paciente,
         a.nome_psicologo,
         a.status,
-        a.lembrete_enviado ? 1 : 0,
+        lembreteEnviado,
         a.observacao,
         a.created_at,
         a.updated_at,
@@ -257,15 +341,26 @@ export async function getAgendamentosPorPaciente(
 export async function getAgendamentosFuturos(
   data: string,
   hora: string,
+  limit: number = 50,
 ): Promise<Record<string, any>[]> {
   const database = await getDb();
   return (await database.getAllAsync(
     `SELECT * FROM agendamentos
      WHERE (data > ? OR (data = ? AND hora_inicial >= ?))
-       AND status NOT IN ('Cancelado Pelo Paciente','Cancelado Pela Clinica','Concluido','Falta')
-     ORDER BY data ASC, hora_inicial ASC`,
-    [data, data, hora],
+       AND status NOT IN ('Cancelado Pela Clinica','Cancelado Pelo Paciente','Concluido','Falta')
+     ORDER BY data ASC, hora_inicial ASC
+     LIMIT ?`,
+    [data, data, hora, limit],
   )) as Record<string, any>[];
+}
+
+/** Marca um agendamento como lembrete enviado (localmente) */
+export async function marcarLembreteEnviado(id: number): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    "UPDATE agendamentos SET lembrete_enviado = 1 WHERE id = ?",
+    [id],
+  );
 }
 
 // ─── Sync Log ─────────────────────────────────────────────────────────────────
@@ -279,13 +374,13 @@ export async function updateSyncLog(tabela: string): Promise<void> {
   );
 }
 
-export async function getSyncLog(): Promise<Record<string, string>> {
+export async function getSyncLog(): Promise<Record<string, string | null>> {
   const database = await getDb();
   const rows = (await database.getAllAsync("SELECT * FROM sync_log")) as Array<{
     tabela: string;
-    ultima_sync: string;
+    ultima_sync: string | null;
   }>;
-  const map: Record<string, string> = {};
+  const map: Record<string, string | null> = {};
   rows.forEach((r) => {
     map[r.tabela] = r.ultima_sync;
   });
@@ -300,5 +395,6 @@ export async function clearDatabase(): Promise<void> {
     DELETE FROM pacientes;
     DELETE FROM users;
     UPDATE sync_log SET ultima_sync = NULL;
+    UPDATE sincronizacao SET ultima_sync = NULL;
   `);
 }

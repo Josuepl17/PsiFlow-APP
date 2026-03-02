@@ -1,0 +1,16 @@
+﻿
+> psiflow-app@1.0.0 lint
+> expo lint
+
+
+C:\Users\Josue\Documents\GitHub\PsiFlow-APP\app\(app)\agendamentos\index.tsx
+  28:10  warning  'pacientes' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  38:10  warning  'showPacienteModal' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  38:29  warning  'setShowPacienteModal' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  39:28  warning  'setPacienteFiltroId' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\Josue\Documents\GitHub\PsiFlow-APP\app\_layout.tsx
+  27:6  warning  React Hook useEffect has a missing dependency: 'loadAuth'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+Ô£û 5 problems (0 errors, 5 warnings)
+

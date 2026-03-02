@@ -18,10 +18,9 @@ import {
 } from "react-native";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { Colors } from "../../constants/colors";
-import { agendarNotificacoesDeSessoes } from "../../hooks/useNotifications";
 import { apiLogin } from "../../services/api";
 import { upsertUser } from "../../services/database";
-import { sincronizar, temInternet } from "../../services/sync";
+import { temInternet } from "../../services/sync";
 import { useAuthStore } from "../../stores/authStore";
 
 const { width } = Dimensions.get("window");
@@ -74,15 +73,9 @@ export default function LoginScreen() {
         // 4. Salvar o token no SecureStore imediatamente
         await SecureStore.setItemAsync("psiflow_token", response.token);
 
-        showNotification("Login realizado! Sincronizando dados...", "success");
+        showNotification("Login realizado! Entrando...", "success");
 
-        // 5. Sincronizar dados iniciais
-        await sincronizar();
-
-        // 6. Agendar notificações Iniciais
-        await agendarNotificacoesDeSessoes();
-
-        // 7. Atualizar estado global
+        // 7. Atualizar estado global (isso disparará o useAutoSync no RootLayout)
         await setAuth(response.token, response.user);
       } else {
         showNotification(response.message || "Falha na autenticação.");

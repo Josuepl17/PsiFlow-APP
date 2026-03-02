@@ -51,6 +51,12 @@
         "projectId": "ebd5e19a-4fc4-44c8-9e14-47e427fc2af9"
       }
     },
-    "owner": "josuepl"
+    "owner": "josuepl",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ebd5e19a-4fc4-44c8-9e14-47e427fc2af9"
+    }
   }
 }

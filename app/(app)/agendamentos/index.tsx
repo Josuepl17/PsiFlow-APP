@@ -5,27 +5,28 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    DeviceEventEmitter,
     FlatList,
     RefreshControl,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, getStatusColors } from "../../../constants/colors";
-import { agendarNotificacoesDeSessoes } from "../../../hooks/useNotifications";
 import {
     getTodosAgendamentos,
     getTodosPacientes,
 } from "../../../services/database";
 import { sincronizar, temInternet } from "../../../services/sync";
+import { useSyncStore } from "../../../stores/syncStore";
 
 export default function AgendamentosScreen() {
+  const { isInitialSyncing } = useSyncStore();
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
-  const [pacientes, setPacientes] = useState<any[]>([]);
   const [filteredAgendamentos, setFilteredAgendamentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,23 +36,20 @@ export default function AgendamentosScreen() {
   // Filtros
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
   const [filtroPaciente, setFiltroPaciente] = useState("");
-  const [showPacienteModal, setShowPacienteModal] = useState(false);
-  const [pacienteFiltroId, setPacienteFiltroId] = useState<number | null>(null);
 
-  const carregarDados = useCallback(async () => {
+  const carregarDados = useCallback(async (silencioso = false) => {
     try {
-      setLoading(true);
-      const [todosAg, todosPac] = await Promise.all([
+      if (!silencioso) setLoading(true);
+      const [todosAg] = await Promise.all([
         getTodosAgendamentos(),
         getTodosPacientes(),
       ]);
       setAgendamentos(todosAg);
-      setPacientes(todosPac);
       verificarConexao();
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
   }, []);
 
@@ -62,6 +60,20 @@ export default function AgendamentosScreen() {
 
   useEffect(() => {
     carregarDados();
+  }, [carregarDados]);
+
+  // Escutar evento de sincronização finalizada para atualizar a lista automaticamente
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener("sync-finished", () => {
+      console.log(
+        "[Agendamentos] Sincronia detectada, atualizando lista silenciosamente...",
+      );
+      carregarDados(true);
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [carregarDados]);
 
   // Aplicar filtros
@@ -80,20 +92,14 @@ export default function AgendamentosScreen() {
       );
     }
 
-    // Filtro por ID específico do paciente
-    if (pacienteFiltroId) {
-      result = result.filter((item) => item.paciente_id === pacienteFiltroId);
-    }
-
     setFilteredAgendamentos(result);
-  }, [agendamentos, dataSelecionada, filtroPaciente, pacienteFiltroId]);
+  }, [agendamentos, dataSelecionada, filtroPaciente]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     const online = await temInternet();
     if (online) {
       await sincronizar();
-      await agendarNotificacoesDeSessoes();
     }
     await carregarDados();
     setRefreshing(false);
@@ -103,7 +109,6 @@ export default function AgendamentosScreen() {
     setRefreshing(true);
     const result = await sincronizar();
     if (result.sucesso) {
-      await agendarNotificacoesDeSessoes();
       await carregarDados();
     } else if (result.semInternet) {
       alert("Sem conexão. Usando dados locais.");
@@ -157,13 +162,7 @@ export default function AgendamentosScreen() {
     );
   };
 
-  if (loading && !refreshing) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.solidPurple} />
-      </View>
-    );
-  }
+  // O loading agora é um overlay, não bloqueamos mais a renderização total aqui para evitar piscadeira
 
   return (
     <View style={styles.container}>
@@ -273,6 +272,16 @@ export default function AgendamentosScreen() {
             <Ionicons name="sync" size={24} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
+      )}
+
+      {/* Overlay de carregamento bloqueante */}
+      {(loading || refreshing || isInitialSyncing) && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color={Colors.solidPurple} />
+            <Text style={styles.loadingText}>Carregando agendamentos...</Text>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -399,5 +408,26 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loadingCard: {
+    backgroundColor: "rgba(30, 30, 35, 0.95)",
+    padding: 30,
+    borderRadius: 20,
+    alignItems: "center",
+    gap: 15,
+    borderWidth: 1,
+    borderColor: "#3f3f46",
+  },
+  loadingText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

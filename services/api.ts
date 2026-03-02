@@ -42,15 +42,24 @@ export async function apiMe() {
 
 // ─── Agendamentos ──────────────────────────────────────────────────────────
 
-export async function apiFetchAgendamentos() {
-  const response = await api.get("/mobile/agendamentos");
+export async function apiFetchAgendamentos(since?: string | null) {
+  const response = await api.get("/mobile/agendamentos", {
+    params: { since },
+  });
   return response.data; // { success, agendamentos, total }
+}
+
+export async function apiMarcarLembreteEnviado(id: number) {
+  const response = await api.post(`/mobile/agendamentos/${id}/lembrete`);
+  return response.data;
 }
 
 // ─── Pacientes ─────────────────────────────────────────────────────────────
 
-export async function apiFetchPacientes() {
-  const response = await api.get("/mobile/pacientes");
+export async function apiFetchPacientes(since?: string | null) {
+  const response = await api.get("/mobile/pacientes", {
+    params: { since },
+  });
   return response.data; // { success, pacientes, total }
 }
 
